@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(GAMES102_HW VERSION 0.0.1)
 message(STATUS "[Project] ${PROJECT_NAME}")
 
+include_directories(eigen-3.3.8) 
+
 include(cmake/InitUCMake.cmake)
 Ubpa_InitUCMake()
 
