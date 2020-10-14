@@ -9,7 +9,7 @@ using namespace Eigen;
 using namespace std;
 using namespace Ubpa;
 
-const int CURVE_POINTS = 20000;
+static int CURVE_POINTS = 20000;
 
 void PolyBaseFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::pointf2>& curve) {
 	curve.clear();
@@ -32,12 +32,11 @@ void PolyBaseFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::poin
 	// Xnn * An1 = Yn1
 	Eigen::MatrixXd X(n,n), A(n,1), Y(n,1);
 
-	double x = 0, y = 0, pre;
+	double x = 0, y = 0;
 	for (int i = 0; i < n; ++i) {
-		x = (points[i][0] - x_min) / x_range;
-		X(i, 0) = pre = 1.0f;
+		x = (points[i][0] -x_min) / x_range;
+		X(i, 0) = 1.0f;
 		for (int j = 1; j < n; ++j) {
-			//X(i, j) = pre = pre * x;
 			X(i, j) = pow(x, j);
 		}
 		
@@ -47,18 +46,20 @@ void PolyBaseFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::poin
 	A = X.fullPivLu().solve(Y);
 
 	double step = 1.0 / CURVE_POINTS;
-	curve.resize(CURVE_POINTS);
-	x = 0;
-	for (int i = 0; i < CURVE_POINTS; ++i, x += step) {
-		y = A(0, 0); pre = 1.0f;
+	curve.resize(CURVE_POINTS+1);
+	Eigen::MatrixXd X1(1, n), Y1(1, 1);
+	for (int i = 0; i <= CURVE_POINTS; ++i) {
+		x = i * step;
+		X1(0, 0) = 1;
 		for (int j = 1; j < n; ++j) {
-			//pre *= x;
-			//y += A(j, 0) * pre;
-			y += A(j, 0) * pow(x, j);
+			X1(0, j) = pow(x, j);
 		}
+		Y1 = X1 * A;
+		y = Y1(0, 0);
 		curve[i][0] = x * x_range + x_min;
 		curve[i][1] = y * y_range + y_min;
 	}
+
 }
 
 void GaussBaseFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::pointf2>& curve, double sigma = 1.0) {
@@ -84,30 +85,34 @@ void GaussBaseFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::poi
 	double sig2 = 2 * sigma * sigma;
 	double x = 0, y = 0;
 	for (int i = 0; i < n; ++i) {
-		x = (points[i][0] - x_min) / x_range;
+		x = (points[i][0] - x_min);
 		G_X(i, 0) = 1.0;
 		for (int j = 1; j <= n; ++j) {
-			double u = (points[j - 1][0] - x_min) / x_range;
+			double u = (points[j - 1][0] - x_min);
 			G_X(i, j) = exp(-(x-u)*(x-u)/sig2);
 		}
 
-		Y(i, 0) = (points[i][1] - y_min) / y_range;
+		Y(i, 0) = (points[i][1] - y_min);
 	}
 
 	B = G_X.fullPivLu().solve(Y);
 
-	double step = 1.0 / CURVE_POINTS;
-	curve.resize(CURVE_POINTS);
-	x = 0;
-	for (int i = 0; i < CURVE_POINTS; ++i, x += step) {
+	double step = x_range / CURVE_POINTS;
+	curve.resize(CURVE_POINTS+1);
+	Eigen::MatrixXd X1(1, n+1), Y1(1, 1);
+	for (int i = 0; i <= CURVE_POINTS; ++i) {
 		y = B(0, 0); 
+		x = i * step;
+		X1(0, 0) = 1.0;
 		for (int j = 1; j <= n; ++j) {
-			double u = (points[j - 1][0] - x_min) / x_range;
-			y += B(j, 0) * exp(-(x - u) * (x - u) / sig2);
+			double u = (points[j - 1][0] - x_min);
+			//y += B(j, 0) * exp(-(x - u) * (x - u) / sig2);
+			X1(0, j) = exp(-(x - u) * (x - u) / sig2);
 		}
-
-		curve[i][0] = x * x_range + x_min;
-		curve[i][1] = y * y_range + y_min;
+		Y1 = X1 * B;
+		y = Y1(0, 0);
+		curve[i][0] = x + x_min;
+		curve[i][1] = y + y_min;
 	}
 }
 
@@ -132,33 +137,34 @@ void PolyFittingFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::p
 	// Xnn * An1 = Yn1
 	Eigen::MatrixXd X(n, maxPower+1), A(maxPower+1, 1), Y(n, 1);
 
-	double x = 0, y = 0, pre;
+	double x = 0, y = 0;
 	for (int i = 0; i < n; ++i) {
-		x = (points[i][0] - x_min) / x_range;
-		X(i, 0) = pre = 1.0f;
+		x = (points[i][0] - x_min);
+		X(i, 0) = 1.0f;
 		for (int j = 1; j <= maxPower; ++j) {
-			//X(i, j) = pre = pre * x;
 			X(i, j) = pow(x, j);
 		}
 
-		Y(i, 0) = (points[i][1] - y_min) / y_range;
+		Y(i, 0) = (points[i][1] - y_min);
 	}
 
-	A = (X.transpose() * X).inverse() * X.transpose() * Y;
+	A = (X.transpose() * X).fullPivLu().solve(X.transpose() * Y);
 	//A = X.jacobiSvd(ComputeThinU | ComputeThinV).solve(Y);
 
-	double step = 1.0 / CURVE_POINTS;
-	curve.resize(CURVE_POINTS);
-	x = 0;
-	for (int i = 0; i < CURVE_POINTS; ++i, x += step) {
-		y = A(0, 0); pre = 1.0f;
+	double step = x_range / CURVE_POINTS;
+	curve.resize(CURVE_POINTS+1);
+	Eigen::MatrixXd X1(1, maxPower+1), Y1(1, 1);
+	for (int i = 0; i <= CURVE_POINTS; ++i) {
+		y = A(0, 0); 
+		x = i * step;
+		X1(0, 0) = 1.0;
 		for (int j = 1; j <= maxPower; ++j) {
-			//pre *= x;
-			//y += A(j, 0) * pre;
-			y += A(j, 0) * pow(x, j);
+			X1(0, j) = pow(x, j);
 		}
-		curve[i][0] = x * x_range + x_min;
-		curve[i][1] = y * y_range + y_min;
+		Y1 = X1 * A;
+		y = Y1(0, 0);
+		curve[i][0] = x + x_min;
+		curve[i][1] = y + y_min;
 	}
 }
 
@@ -183,33 +189,34 @@ void RidgeRegression(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::point
 	// Xnn * An1 = Yn1
 	Eigen::MatrixXd X(n, maxPower + 1), A(maxPower + 1, 1), Y(n, 1);
 
-	double x = 0, y = 0, pre;
+	double x = 0, y = 0;
 	for (int i = 0; i < n; ++i) {
 		x = (points[i][0] - x_min) / x_range;
-		X(i, 0) = pre = 1.0f;
+		X(i, 0) = 1.0f;
 		for (int j = 1; j <= maxPower; ++j) {
-			//X(i, j) = pre = pre * x;
 			X(i, j) = pow(x, j);
 		}
 
 		Y(i, 0) = (points[i][1] - y_min) / y_range;
 	}
-	
-	auto b = X.transpose() * X + lamda * MatrixXd::Identity(maxPower + 1, maxPower + 1);
+
+	double l = (double)lamda / x_range;
+	auto b = X.transpose() * X + l * MatrixXd::Identity(maxPower + 1, maxPower + 1);
 	auto c = X.transpose() * Y;
 	A = b.fullPivLu().solve(c);
-	//A = X.jacobiSvd(ComputeThinU | ComputeThinV).solve(Y);
+	//A = b.Inverse() * c;
 
 	double step = 1.0 / CURVE_POINTS;
-	curve.resize(CURVE_POINTS);
-	x = 0;
-	for (int i = 0; i < CURVE_POINTS; ++i, x += step) {
-		y = A(0, 0); pre = 1.0f;
+	curve.resize(CURVE_POINTS+1);
+	Eigen::MatrixXd X1(1, maxPower + 1), Y1(1, 1);
+	for (int i = 0; i <= CURVE_POINTS; ++i) {
+		x = i * step;
+		X1(0, 0) = 1.0;
 		for (int j = 1; j <= maxPower; ++j) {
-			//pre *= x;
-			//y += A(j, 0) * pre;
-			y += A(j, 0) * pow(x, j);
+			X1(0, j) = pow(x, j);
 		}
+		Y1 = X1 * A;
+		y = Y1(0,0);
 		curve[i][0] = x * x_range + x_min;
 		curve[i][1] = y * y_range + y_min;
 	}
@@ -225,17 +232,18 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			ImGui::Checkbox("Enable grid", &data->opt_enable_grid);
 			ImGui::Checkbox("Enable context menu", &data->opt_enable_context_menu);
 			static int select = 1;
-			ImGui::RadioButton("Polynomial Basis Function", &select, 1);
-			ImGui::RadioButton("Gauss Basis Function", &select, 2);
+			ImGui::RadioButton("Polynomial Basis Function (Red Line)", &select, 1);
+			ImGui::RadioButton("Gauss Basis Function (Green Line)", &select, 2);
 			static float sigma = 1.0f;
-			ImGui::SliderFloat("Sigma:", &sigma, 0.1f, 10);
-			ImGui::RadioButton("Polynomial Fitting Function", &select, 3);
+			ImGui::SliderFloat("Sigma:", &sigma, 0.1f, 50);
+			ImGui::RadioButton("Polynomial Fitting Function (Blue Line)", &select, 3);
 			static int maxPower = 4;
-			ImGui::SliderInt("MaxPower:", &maxPower, 1, 10);
-			ImGui::RadioButton("Ridge Regression", &select, 4);
+			ImGui::SliderInt("MaxPower:", &maxPower, 1, 15);
+			ImGui::RadioButton("Ridge Regression (White Line)", &select, 4);
 			static float lamda = 0;
-			ImGui::SliderFloat("lamda:", &lamda, -1.0f, 1.0f);
+			ImGui::SliderFloat("lamda:", &lamda, -50.0f, 50.0f);
 			ImGui::Text("Mouse Left: click to add point,\nMouse Right: drag to scroll, click for context menu.");
+			ImGui::InputInt("Curve Totoal Points", &CURVE_POINTS, 100, 1000);
 			// Typically you would use a BeginChild()/EndChild() pair to benefit from a clipping region + own scrolling.
 			// Here we demonstrate that this can be replaced by simple offsetting + custom drawing + PushClipRect/PopClipRect() calls.
 			// To use a child window instead we could use, e.g:
@@ -348,19 +356,19 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 			
 			// draw curve
 			for (size_t n = 0; n + 1 < data->curve1.size(); n += 1) {
-				draw_list->AddLine(ImVec2(origin.x + data->curve1[n][0], origin.y + data->curve1[n][1]), ImVec2(origin.x + data->curve1[n + 1][0], origin.y + data->curve1[n + 1][1]), IM_COL32(255, 0, 0, 255), 1.0f);
+				draw_list->AddLine(ImVec2(origin.x + data->curve1[n][0], origin.y + data->curve1[n][1]), ImVec2(origin.x + data->curve1[n + 1][0], origin.y + data->curve1[n + 1][1]), IM_COL32(255, 0, 0, 255), 2.0f);
 			}
 
 			for (size_t n = 0; n + 1 < data->curve2.size(); n += 1) {
-				draw_list->AddLine(ImVec2(origin.x + data->curve2[n][0], origin.y + data->curve2[n][1]), ImVec2(origin.x + data->curve2[n + 1][0], origin.y + data->curve2[n + 1][1]), IM_COL32(0, 255, 0, 255), 1.0f);
+				draw_list->AddLine(ImVec2(origin.x + data->curve2[n][0], origin.y + data->curve2[n][1]), ImVec2(origin.x + data->curve2[n + 1][0], origin.y + data->curve2[n + 1][1]), IM_COL32(0, 255, 0, 255), 2.0f);
 			}
 
 			for (size_t n = 0; n + 1 < data->curve3.size(); n += 1) {
-				draw_list->AddLine(ImVec2(origin.x + data->curve3[n][0], origin.y + data->curve3[n][1]), ImVec2(origin.x + data->curve3[n + 1][0], origin.y + data->curve3[n + 1][1]), IM_COL32(0, 0, 255, 255), 1.0f);
+				draw_list->AddLine(ImVec2(origin.x + data->curve3[n][0], origin.y + data->curve3[n][1]), ImVec2(origin.x + data->curve3[n + 1][0], origin.y + data->curve3[n + 1][1]), IM_COL32(0, 0, 255, 255), 2.0f);
 			}
 
 			for (size_t n = 0; n + 1 < data->curve4.size(); n += 1) {
-				draw_list->AddLine(ImVec2(origin.x + data->curve4[n][0], origin.y + data->curve4[n][1]), ImVec2(origin.x + data->curve4[n + 1][0], origin.y + data->curve4[n + 1][1]), IM_COL32(0, 255, 255, 255), 1.0f);
+				draw_list->AddLine(ImVec2(origin.x + data->curve4[n][0], origin.y + data->curve4[n][1]), ImVec2(origin.x + data->curve4[n + 1][0], origin.y + data->curve4[n + 1][1]), IM_COL32(255, 255, 255, 255), 2.0f);
 			}
 			
 			draw_list->PopClipRect();
