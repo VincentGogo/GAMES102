@@ -139,19 +139,19 @@ void PolyFittingFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::p
 
 	double x = 0, y = 0;
 	for (int i = 0; i < n; ++i) {
-		x = (points[i][0] - x_min);
+		x = (points[i][0] - x_min) / x_range;
 		X(i, 0) = 1.0f;
 		for (int j = 1; j <= maxPower; ++j) {
 			X(i, j) = pow(x, j);
 		}
 
-		Y(i, 0) = (points[i][1] - y_min);
+		Y(i, 0) = (points[i][1] - y_min) / y_range;
 	}
 
 	A = (X.transpose() * X).fullPivLu().solve(X.transpose() * Y);
 	//A = X.jacobiSvd(ComputeThinU | ComputeThinV).solve(Y);
 
-	double step = x_range / CURVE_POINTS;
+	double step = 1.0 / CURVE_POINTS;
 	curve.resize(CURVE_POINTS+1);
 	Eigen::MatrixXd X1(1, maxPower+1), Y1(1, 1);
 	for (int i = 0; i <= CURVE_POINTS; ++i) {
@@ -163,8 +163,8 @@ void PolyFittingFunction(std::vector<Ubpa::pointf2>& points, std::vector<Ubpa::p
 		}
 		Y1 = X1 * A;
 		y = Y1(0, 0);
-		curve[i][0] = x + x_min;
-		curve[i][1] = y + y_min;
+		curve[i][0] = x * x_range + x_min;
+		curve[i][1] = y * y_range + y_min;
 	}
 }
 
