@@ -335,6 +335,18 @@ void CanvasSystem::OnUpdate(Ubpa::UECS::Schedule& schedule) {
 					data->curve3.clear();
 					data->curve4.clear();
 				}
+				if (ImGui::MenuItem("Remove red line", NULL, false, data->curve1.size() > 0)) {
+					data->curve1.clear();
+				}
+				if (ImGui::MenuItem("Remove green line", NULL, false, data->curve2.size() > 0)) {
+					data->curve2.clear();
+				}
+				if (ImGui::MenuItem("Remove blue line", NULL, false, data->curve3.size() > 0)) {
+					data->curve3.clear();
+				}
+				if (ImGui::MenuItem("Remove white line", NULL, false, data->curve4.size() > 0)) {
+					data->curve4.clear();
+				}
 				ImGui::EndPopup();
 			}
 
